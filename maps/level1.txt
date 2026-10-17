@@ -1,0 +1,23 @@
+; Robo Rally mini - level 1 (12 x 12). One row per line, cells separated by spaces.
+; (0,0) is the top-left (north-west) corner. x = column, y = row.
+;   .  normal          #  wall           O  hole
+;   >  <  ^  v         straight conveyor (moves the robot 1 cell that way)
+;   r> lv ...          curved conveyor: moves 1 cell AND turns the robot (r = right, l = left)
+;   S shield   T turbo/boost   K repair kit   J jump
+;   1  2  3            checkpoints
+; Start cells (set in code): team 1 at (0,0) (0,1), team 2 at (11,11) (11,10).
+; Counts: 79 normal, 22 walls, 22 conveyors, 10 holes, 8 bonus, 3 checkpoints.
+; The board is point-symmetric, so both teams face the same obstacles.
+; Checkpoint 1 is at (5,5): the real walking distance to it is the same for both teams (16 and 15 cells).
+.  .  .  #  .  .  .  .  .  .  .  .
+.  lv <  .  ^  .  #  .  .  J  2  v
+.  .  O  .  #  #  T  .  .  .  .  v
+.  S  #  #  ^  .  .  .  O  .  .  v
+.  .  O  .  r^ <  <  <  #  #  #  .
+O  #  .  K  O  1  .  #  .  .  .  .
+.  .  .  .  #  .  .  O  K  .  #  O
+.  #  #  #  >  >  >  rv .  O  .  .
+^  .  .  O  .  .  .  v  #  #  S  .
+^  .  .  .  .  T  #  #  .  O  .  .
+^  3  J  .  .  #  .  v  .  >  l^ .
+.  .  .  .  .  .  .  .  #  .  .  .

@@ -21,7 +21,8 @@ from .rules import RulesEngine
 class Game:
     def __init__(self, board: Board, strategies: Dict[int, object], seed: Optional[int] = None,
                  bus: Optional[EventBus] = None):
-        """strategies: {team_id: Strategy} - both robots of a team use the same strategy."""
+        """strategies: one Strategy per robot ({"R1_E1": ..., "R2_E1": ..., ...}),
+        or per team ({1: ..., 2: ...}) when both robots of a team play the same way."""
         self.rng = random.Random(seed)
         self.state = GameState.new_game(board)
         self.bus = bus or EventBus()
@@ -55,6 +56,9 @@ class Game:
 
     # ---- programming ----------------------------------------------------
     def strategy_of(self, robot: Robot):
+        """The robot's own strategy if it has one, otherwise its team's."""
+        if robot.id in self.strategies:
+            return self.strategies[robot.id]
         return self.strategies[robot.team_id]
 
     def program_size(self, robot: Robot) -> int:

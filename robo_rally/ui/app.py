@@ -14,7 +14,7 @@ from .assets import Assets
 from .board_view import BoardView
 from .program_panel import ProgramPanel
 
-PLAYER_TYPES = {"Perceptron AI": "ai", "Random": "random", "Human": "human"}
+PLAYER_TYPES = {"Perceptron AI": "ai", "Oracle": "oracle", "Random": "random", "Human": "human"}
 LOGGED = {EventType.TURN_STARTED, EventType.CARD_PLAYED, EventType.PUSHED, EventType.ELIMINATED,
           EventType.CHECKPOINT, EventType.FINISHED, EventType.BONUS_PICKED, EventType.SHIELD_USED,
           EventType.JUMPED, EventType.DAMAGED, EventType.REPAIRED, EventType.CONVEYORS,
@@ -52,17 +52,21 @@ class RoboRallyApp(tk.Tk):
     def _build_setup(self, parent):
         box = ttk.LabelFrame(parent, text="New game", padding=8)
         box.pack(fill="x")
-        self.team_vars = {}
-        for row, (team, default) in enumerate([(1, "Human"), (2, "Perceptron AI")]):
+        # one player type per robot, so a team can mix e.g. an oracle and a perceptron
+        self.robot_vars = {}
+        defaults = {"R1_E1": "Human", "R2_E1": "Human", "R1_E2": "Perceptron AI", "R2_E2": "Oracle"}
+        for row, team in enumerate((1, 2)):
             ttk.Label(box, text=f"Team {team} ({'blue' if team == 1 else 'red'})").grid(row=row, column=0, sticky="w")
-            var = tk.StringVar(value=default)
-            ttk.Combobox(box, textvariable=var, values=list(PLAYER_TYPES), state="readonly", width=14).grid(
-                row=row, column=1, padx=6, pady=2)
-            self.team_vars[team] = var
+            for col, number in enumerate((1, 2)):
+                robot_id = f"R{number}_E{team}"
+                var = tk.StringVar(value=defaults[robot_id])
+                ttk.Combobox(box, textvariable=var, values=list(PLAYER_TYPES), state="readonly", width=12).grid(
+                    row=row, column=1 + col, padx=(6, 0), pady=2)
+                self.robot_vars[robot_id] = var
         ttk.Label(box, text="Seed").grid(row=2, column=0, sticky="w")
         self.seed_var = tk.StringVar(value="")
-        ttk.Entry(box, textvariable=self.seed_var, width=8).grid(row=2, column=1, sticky="w", padx=6)
-        ttk.Button(box, text="Start", command=self.new_game).grid(row=0, column=2, rowspan=3, padx=(6, 0))
+        ttk.Entry(box, textvariable=self.seed_var, width=8).grid(row=2, column=1, sticky="w", padx=(6, 0))
+        ttk.Button(box, text="Start", command=self.new_game).grid(row=2, column=2, sticky="e", pady=(4, 0))
 
     def _build_controls(self, parent):
         box = ttk.LabelFrame(parent, text="Play", padding=8)
@@ -100,7 +104,7 @@ class RoboRallyApp(tk.Tk):
     def new_game(self):
         self.stop()
         seed = int(self.seed_var.get()) if self.seed_var.get().strip().isdigit() else None
-        strategies = {team: make_strategy(PLAYER_TYPES[var.get()]) for team, var in self.team_vars.items()}
+        strategies = {robot_id: make_strategy(PLAYER_TYPES[var.get()]) for robot_id, var in self.robot_vars.items()}
         self.game = Game(self.board, strategies, seed=seed)
         self.game.bus.subscribe(self.on_event)              # Observer: the log listens to the game
         self.log.config(state="normal")

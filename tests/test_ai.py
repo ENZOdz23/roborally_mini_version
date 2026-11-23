@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from robo_rally.ai import Perceptron, PerceptronStrategy, RandomStrategy, make_strategy
+from robo_rally.ai import OracleStrategy, Perceptron, PerceptronStrategy, RandomStrategy, make_strategy
 from robo_rally.ai.features import FEATURES, extract
 from robo_rally.ai.pathfinding import UNREACHABLE, DistanceMap
 from robo_rally.ai.simulator import simulate
@@ -126,3 +126,58 @@ class TestPerceptronStrategy(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOracle(unittest.TestCase):
+    """The oracle follows the shortest path to the next checkpoint without simulating the rules."""
+
+    def choose(self, tiles, robot, hand, size=3):
+        state, _ = make_game({(11, 0): ".", **tiles}, {"R1_E1": robot})
+        return OracleStrategy().choose(state, state.robot_by_id("R1_E1"), hand, size)
+
+    def test_goes_straight_to_the_checkpoint(self):
+        # CP1 three cells east: Move 3 first, then nothing left to gain
+        program = self.choose({(8, 5): "1"}, (5, 5, E),
+                              [TurnCard(Rotation.LEFT), MoveCard(3), MoveCard(1), BackUpCard(), MoveCard(2)])
+        self.assertEqual(program[0].name, "Move 3")
+
+    def test_turns_toward_the_path(self):
+        # CP1 is north while the robot faces east: turn left, then move
+        program = self.choose({(5, 2): "1"}, (5, 5, E),
+                              [MoveCard(1), TurnCard(Rotation.RIGHT), TurnCard(Rotation.LEFT), MoveCard(3), BackUpCard()])
+        self.assertEqual([c.name for c in program[:2]], ["Turn Left", "Move 3"])
+
+    def test_never_walks_into_a_hole(self):
+        program = self.choose({(6, 5): "O", (9, 5): "1"}, (5, 5, E),
+                              [MoveCard(1), MoveCard(2), TurnCard(Rotation.LEFT), TurnCard(Rotation.RIGHT), BackUpCard()])
+        state, _ = make_game({(11, 0): ".", (6, 5): "O", (9, 5): "1"}, {"R1_E1": (5, 5, E)})
+        result = simulate(state, "R1_E1", program)
+        self.assertTrue(result.robot.on_board())
+
+    def test_keeps_a_safe_card_for_the_last_slot(self):
+        # robot on the north edge facing north: Move 1 first falls off the board,
+        # so the oracle must find an order where Back Up or the turn comes before it.
+        oracle = OracleStrategy()
+        state, _ = make_game({(11, 0): ".", (5, 9): "1"}, {"R1_E1": (5, 0, N)})
+        robot = state.robot_by_id("R1_E1")
+        hand = [BackUpCard(), MoveCard(1), TurnCard(Rotation.LEFT)]
+        dm = oracle.distances(state.board)
+        self.assertFalse(oracle.leaves_a_safe_way(MoveCard(1), hand, 2, robot.position, N, 1, dm))
+        program = oracle.choose(state, robot, hand, 3)
+        self.assertTrue(simulate(state, "R1_E1", program).robot.on_board())
+
+    def test_factory_and_per_robot_players(self):
+        self.assertIsInstance(make_strategy("oracle"), OracleStrategy)
+        board = Board.from_file(LEVEL1)
+        players = {"R1_E1": make_strategy("ai"), "R2_E1": make_strategy("oracle"),
+                   "R1_E2": make_strategy("oracle"), "R2_E2": make_strategy("random")}
+        game = Game(board, players, seed=4)
+        for robot in game.state.robots():
+            self.assertIs(game.strategy_of(robot), players[robot.id])
+        game.play_to_end()
+        self.assertTrue(game.state.over)
+
+    def test_team_players_still_work(self):
+        game = Game(Board.from_file(LEVEL1), {1: make_strategy("oracle"), 2: make_strategy("random")}, seed=2)
+        robot = game.state.robot_by_id("R2_E1")
+        self.assertIsInstance(game.strategy_of(robot), OracleStrategy)
